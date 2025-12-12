@@ -139,7 +139,7 @@ public partial class Process_Config : System.Web.UI.Page
     }
 
     [WebMethod]
-    public static List<DesignationModel> GetAssignedDesignations(string escom)
+    public static List<DesignationModel> GetAssignedDesignations(string escom, string Stack_Id)
     {
         List<DesignationModel> list = new List<DesignationModel>();
 
@@ -147,7 +147,10 @@ public partial class Process_Config : System.Web.UI.Page
         PName[0] = "@Escom";
 
 
-        DataTable dt = SqlCmd.SelectDatakpcl("SP_USER_DETAILS_V1", Param, PName, 1);
+        Param[1] = Stack_Id;
+        PName[1] = "@STACKHOLDER_ID";
+
+        DataTable dt = SqlCmd.SelectDatakpcl("SP_USER_DETAILS_V1", Param, PName, 2);
 
         foreach (DataRow dr in dt.Rows)
         {
@@ -155,6 +158,29 @@ public partial class Process_Config : System.Web.UI.Page
             {
                 ID = dr["ID"].ToString(),
                 Name = dr["FULLNAME"].ToString()
+            });
+        }
+
+        return list;
+    }
+
+
+    [WebMethod]
+    public static List<DesignationModel> StakeHolders(string ESCOM_ID)
+    {
+        List<DesignationModel> list = new List<DesignationModel>();
+
+        Param[0] = ESCOM_ID;
+        PName[0] = "@ESCOM_ID";
+
+        DataTable dt = SqlCmd.SelectDatakpcl("SP_GET_STACKHOLDERS", Param, PName, 1);
+
+        foreach (DataRow dr in dt.Rows)
+        {
+            list.Add(new DesignationModel()
+            {
+                ID = dr["STACKHOLDER_ID"].ToString(),
+                Name = dr["STACKHOLDER_NAME"].ToString()
             });
         }
 
@@ -173,6 +199,7 @@ public partial class Process_Config : System.Web.UI.Page
             string FormName = permissionsData.ContainsKey("FormName") ? permissionsData["FormName"] : "";
             string FormURL = permissionsData.ContainsKey("FormURL") ? permissionsData["FormURL"] : "";
             string ModuleID = permissionsData.ContainsKey("ModuleID") ? permissionsData["ModuleID"] : "";
+            string Stakeholder_ID = permissionsData.ContainsKey("Stakeholder_ID") ? permissionsData["Stakeholder_ID"] : "";
 
             string Read_DesignationIDs = permissionsData.ContainsKey("Read_DesignationIDs")
                                          ? permissionsData["Read_DesignationIDs"] : "";
@@ -189,8 +216,8 @@ public partial class Process_Config : System.Web.UI.Page
 
             login_user = HttpContext.Current.Session["USERNAME"].ToString();
             userId = HttpContext.Current.Session["UserId"].ToString();
-            string[] Param = new string[12];
-            string[] PName = new string[12];
+            string[] Param = new string[13];
+            string[] PName = new string[13];
 
             Param[0] = ESCOM_ID;
             PName[0] = "@ESCOMID";
@@ -228,7 +255,10 @@ public partial class Process_Config : System.Web.UI.Page
             Param[11] = EscomNmae;
             PName[11] = "@ESCOM_NAME";
 
-            SqlCmd.ExecNonQuerykpcl("SP_SAVE_PROCESS_DETAILS", Param, PName, 12);
+            Param[12] = Stakeholder_ID;
+            PName[12] = "@STACKHOLDER_ID";
+
+            SqlCmd.ExecNonQuerykpcl("SP_SAVE_PROCESS_DETAILS", Param, PName, 13);
 
             return "Success";
         }
