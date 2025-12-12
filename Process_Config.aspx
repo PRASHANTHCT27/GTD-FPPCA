@@ -7,6 +7,7 @@
 
       $(document).ready(function () {
           $("#Id_id1").hide();
+          $("#dataTableContainer").hide();
 
           loadEscoms();
           Get_DATA();
@@ -25,7 +26,6 @@
               $("#grantedList").empty();
               $("#ddl_Des_Name").empty();
 
-              // Clear the entire summary when adding new
               $("#selectedList").empty();
           });
 
@@ -48,16 +48,13 @@
           $("#ddl_STACK").on("change", function () {
               var Stack_id = $("#ddl_STACK").val();
 
-              // Clear the current stakeholder's granted list and designations when changed
               $("#grantedList").empty();
               $("#ddl_Des_Name").empty();
 
-              // Load new designations for the selected stakeholder
               if (Stack_id) {
                   loadAssignedDesignations(Stack_id);
               }
 
-              // Update summary to remove old stakeholder row if it was empty
               refreshSelectedList();
           });
 
@@ -174,7 +171,6 @@
                   success: function (res) {
                       if (res.d == 'Success') {
                           showSuccessMessage("Data Saved Successfully");
-                          // DO NOT clear the granted list or summary
                           // $("#grantedList").empty();
                           // refreshSelectedList();
                       }
@@ -296,6 +292,12 @@
 
       function LoadProcessDetails() {
           var escomId = $("#ddlEscoms").val();
+
+          if (!escomId || escomId === "0" || escomId === null || escomId === "") {
+              showWarningmessage("!Select Escoms");
+              return;   
+          }
+
           $.ajax({
               url: "Process_Config.aspx/GetProcessDetails",
               type: "POST",
@@ -305,19 +307,36 @@
               success: function (res) {
                   var data = JSON.parse(res.d);
                   console.log("Process Details:", data);
+                  if (!data || data.length === 0) {
+                      $("#dataTableContainer").hide();
+                      showWarningmessage("!Data Not Found");
+                  } else {
+                      $("#dataTableContainer").show();
+                  }
                   $("#dataTableBody").empty();
                   $("#dataTableHeader").html(`
                 <tr>
-                    <th>SLNO</th><th>DESG</th><th>ESCOM</th><th>FORMNAME</th>
-                    <th>FORMURL</th><th>Read</th><th>Read & Write</th>
-                    <th>SEQUENANCE</th><th>STATUS</th><th>EDIT</th>
+                    <th>SLNO</th>
+                    
+                    <th>ESCOM</th>
+                    <th>StackHolder</th>
+                    <th>DESG</th>
+                    <th>FORMNAME</th>
+                    <th>FORMURL</th>
+                    <th>Read</th>
+                    <th>Read & Write</th>
+                    <th>SEQUENANCE</th>
+                    <th>STATUS</th>
+                    <th>EDIT</th>
                 </tr>`);
                   data.forEach(function (r, i) {
                       let encodedRow = btoa(JSON.stringify(r));
                       let row = `<tr>
                     <td>${i + 1}</td>
-                    <td>${r.DESG || ''}</td>
+                   
                     <td>${r.ESCOM || ''}</td>
+                      <td>${r.STACKHOLDER_ID || ''}</td>
+                      <td>${r.DESG || ''}</td>
                     <td>${r.FORMNAME || r.FORMNAMES || ''}</td>
                     <td>${r.FORMURL || ''}</td>
                     <td>${r.PREAD || ''}</td>
@@ -340,26 +359,21 @@
           const stackholderName = $("#ddl_STACK option:selected").text();
           const stackholderId = $("#ddl_STACK").val();
 
-          // Get current designations from granted list
           const currentDesignations = [];
           $("#grantedList li").each(function () {
               const designationName = $(this).text().split(" / ")[0];
               currentDesignations.push(`<b>${designationName}</b>`);
           });
 
-          // Only update if we have a valid stakeholder and designations
           if (stackholderName && stackholderId &&
               stackholderName !== "-- Select STACKHOLDERS --" &&
               currentDesignations.length > 0) {
 
-              // Check if this stakeholder already exists in the summary
               const existingRows = $("#selectedList").find(`div[data-stack-id="${stackholderId}"]`);
 
               if (existingRows.length > 0) {
-                  // Update existing row
                   existingRows.html(`${stackholderName} : ${currentDesignations.join(" → ")}`);
               } else {
-                  // Add new row
                   const newRow = `<div data-stack-id="${stackholderId}" style="margin-bottom: 8px;">
                 ${stackholderName} : ${currentDesignations.join(" → ")}
             </div>`;
@@ -368,7 +382,6 @@
           }
       }
 
-      // New function to clear summary for a specific stakeholder when it changes
       function clearCurrentStackholderSummary() {
           const stackholderId = $("#ddl_STACK").val();
           if (stackholderId) {
@@ -384,21 +397,17 @@
           $("#Id_id1").show();
           $("#dataTableContainer").hide();
 
-          // Clear previous data
           $("#selectedList").empty();
           $("#grantedList").empty();
           $("#ddl_Des_Name").empty();
           $("#ddl_STACK").empty();
 
-          // Set ESCOM
           $("#ddlEscoms").val(r.ESCOMID);
           console.log("ESCOM set to:", r.ESCOMID);
 
-          // Set Form Name
           $("#ddl_Form_Name").val(r.FORMID);
           console.log("Form set to:", r.FORMID);
 
-          // Load Stakeholders first
           $.ajax({
               url: "Process_Config.aspx/StakeHolders",
               type: "POST",
@@ -418,22 +427,16 @@
 
                       console.log("Stakeholders loaded, total:", data.length);
 
-                      // Now set the stakeholder value - try multiple possible field names
-                      const stackId = r.STACKID || r.STACK_ID || r.StackID || r.Stack_ID || r.STACKHOLDERID;
+                      const stackId = r.STACKHOLDER_ID || r.STACKID || r.STACK_ID ||
+                          r.StackID || r.Stack_ID || r.STACKHOLDERID;
 
                       if (stackId) {
                           $("#ddl_STACK").val(stackId);
                           console.log("Stakeholder set to:", stackId, "Name:", $("#ddl_STACK option:selected").text());
-                      } else {
-                          console.warn("No STACKID found in row data. Available fields:", Object.keys(r));
-                      }
 
-                      // Wait a bit then load designations
-                      setTimeout(function () {
-                          const selectedStackId = $("#ddl_STACK").val();
+                          loadAssignedDesignations(stackId).then(function () {
+                              console.log("Designations loaded for edit");
 
-                          if (selectedStackId) {
-                              // Parse the data we need
                               const seqIds = (r.SEQUENANCE || "").toString().split(",").map(x => x.trim()).filter(x => x);
                               const readIds = (r.PREAD || "").toString().split(",").map(x => x.trim()).filter(x => x);
                               const writeIds = (r.PWRITE || "").toString().split(",").map(x => x.trim()).filter(x => x);
@@ -442,68 +445,53 @@
                               console.log("Read IDs:", readIds);
                               console.log("Write IDs:", writeIds);
 
-                              // Load designations for this stakeholder
-                              loadAssignedDesignations(selectedStackId).then(function () {
-                                  console.log("Designations loaded for edit");
+                              setTimeout(function () {
+                                  $("#ddl_Des_Name option").prop("selected", false);
 
-                                  // Select the designations in dropdown and add to granted list
-                                  setTimeout(function () {
-                                      $("#ddl_Des_Name option").prop("selected", false);
+                                  seqIds.forEach(function (id) {
+                                      if (!id) return;
 
-                                      seqIds.forEach(function (id) {
-                                          if (!id) return;
-                                          const opt = $("#ddl_Des_Name option[value='" + id + "']");
+                                      const opt = $("#ddl_Des_Name option[value='" + id + "']");
 
-                                          if (opt.length > 0) {
-                                              opt.prop("selected", true);
-                                              const name = opt.text();
+                                      if (opt.length > 0) {
+                                          opt.prop("selected", true);
 
-                                              // Determine access type
-                                              let access = "Read";
-                                              if (writeIds.includes(id)) {
-                                                  access = "Read/Write";
-                                              } else if (readIds.includes(id)) {
-                                                  access = "Read";
-                                              }
+                                          const name = opt.text();
 
-                                              console.log("Selected - ID:", id, "Name:", name, "Access:", access);
-
-                                              // Add to granted list for display
-                                              const li = $("<li>")
-                                                  .addClass("list-group-item")
-                                                  .attr("data-id", id)
-                                                  .text(name + " / " + access)
-                                                  .on("click", function () {
-                                                      $(this).toggleClass("active");
-                                                  });
-                                              $("#grantedList").append(li);
-                                          } else {
-                                              console.warn("Designation ID not found:", id);
+                                          let access = "Read";
+                                          if (writeIds.includes(id)) {
+                                              access = "Read/Write";
+                                          } else if (readIds.includes(id)) {
+                                              access = "Read";
                                           }
-                                      });
 
-                                      $("#ddl_Des_Name").trigger("change");
+                                          console.log("Selected in dropdown - ID:", id, "Name:", name, "Access:", access);
+                                      } else {
+                                          console.warn("Designation ID not found in dropdown:", id);
+                                      }
+                                  });
 
-                                      // Remove selected items from dropdown
-                                      $("#ddl_Des_Name option:selected").remove();
+                                  $("#ddl_Des_Name").trigger("change").focus().blur();
 
-                                      console.log("Total items in granted list:", $("#grantedList li").length);
+                                  var selectElement = document.getElementById("ddl_Des_Name");
+                                  if (selectElement) {
+                                      selectElement.dispatchEvent(new Event('change'));
+                                  }
 
-                                      // Refresh the summary
-                                      refreshSelectedList();
+                                  console.log("Total designations selected:", $("#ddl_Des_Name option:selected").length);
 
-                                  }, 150);
 
-                              }).catch(function (err) {
-                                  console.error("Error loading designations:", err);
-                                  alert("Error loading designations. Please try again.");
-                              });
-                          } else {
-                              console.error("No stakeholder selected after binding");
-                              alert("Unable to load stakeholder. Please check the data.");
-                          }
-                      }, 200);
 
+                              }, 200);
+
+                          }).catch(function (err) {
+                              console.error("Error loading designations:", err);
+                              alert("Error loading designations. Please try again.");
+                          });
+                      } else {
+                          console.warn("No STACKHOLDER_ID found in row data. Available fields:", Object.keys(r));
+                          alert("Unable to identify stakeholder from data. Please check the STACKHOLDER_ID field.");
+                      }
                   } else {
                       console.error("No stakeholders returned from server");
                       alert("No stakeholders found for this ESCOM");
@@ -511,7 +499,7 @@
               },
               error: function (err) {
                   console.log("Error loading stakeholders:", err);
-                  alert("Error fetching Stackholders!");
+                  alert("Error fetching Stakeholders!");
               }
           });
       }
