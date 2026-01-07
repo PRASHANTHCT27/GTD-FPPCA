@@ -12,8 +12,85 @@
         var Generation_type = 0;
         var Generator_Name = 0;
 
+        let allowedUsers = [];
+        let hasEditAccess = false;
+        let loggedUserId = null;
+
         $(document).ready(function () {
             debugger;
+            initUserAccess();
+
+            $('#btn_Add').hide();
+            $("#btn_back").hide();
+
+            getUserDetails(function () {
+
+                Get_User();
+
+            });
+
+            function initUserAccess() {
+                getUserDetails(function () {
+                    getAllowedUsers(function () {
+                        checkUserAccess();
+                    });
+                });
+            }
+
+            function getUserDetails(callback) {
+                $.ajax({
+                    type: 'POST',
+                    url: 'Frm_Formula_Maker.aspx/getLoginUserId',
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    data: JSON.stringify({}),
+                    success: function (res) {
+                        loggedUserId = Number(res.d);
+                        if (callback) callback();
+                    },
+                    error: function (err) {
+                        console.error("UserId error:", err.responseText);
+                    }
+                });
+            }
+
+            function getAllowedUsers(callback) {
+                $.ajax({
+                    type: "POST",
+                    url: "Frm_Formula_Maker.aspx/GetAllowedUserIds",
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    success: function (res) {
+                        allowedUsers = res.d.map(Number);
+                        hasEditAccess = allowedUsers.includes(loggedUserId);
+                        if (callback) callback();
+                    },
+                    error: function (xhr) {
+                        console.error("Permission error:", xhr.responseText);
+                    }
+                });
+            }
+
+            function checkUserAccess() {
+                $('#btn_Save, #btn_Update, .btn-edit').toggle(hasEditAccess);
+            }
+
+
+
+            function checkUserAccess() {
+                if (hasEditAccess) {
+                    $('#btn_Save').show();
+                    $('.btn-edit').show();
+                    $('#btn_Update').show();
+                    $('#btn_Add').show();
+                } else {
+                    $('#btn_Save').hide();
+                    $('#btn_Update').hide();
+                    $('.btn-edit').hide();
+                    $('#btn_Add').hide();
+                }
+            }
+
             $("#Id_Section2").hide();
             $("#btn_back").hide();
 
@@ -309,7 +386,7 @@
                     var ddl = $("#ddl_PlantName");
                     ddl.empty();
                     if (data.length > 1) {
-                        ddl.append($('<option>', { value: 'ALL', text: '-- Select Plant Name --' }));
+                        ddl.append($('<option>', { value: 'ALL', text: 'Select Plant Name' }));
                     }
 
 
@@ -428,7 +505,7 @@
         //                        </td>
         //                    </tr>`;*/
         //                        $("#dataContainer").hide();
-        //                        showInfoMessage("!Data Not Found");
+        //                        showInfoMessage("!No Data Found");
         //                    }
 
         //                    $("#dataTableHeader").html(`
@@ -506,28 +583,44 @@
                 `;
 
                         data.forEach((row, i) => {
+
+                            let editCell = '';
+
+                            if (hasEditAccess) {
+                                editCell = `
+            <i class="fa fa-edit btn-edit"
+               style="color:blue;cursor:pointer;"
+               title="Edit"></i>
+        `;
+                            } else {
+                                editCell = `
+            <i class="fas fa-lock"
+   style="color:#999;font-size:16px;cursor:not-allowed;"
+   title="You don't have edit permission"></i>
+        `;
+                            }
+
                             tbody += `
-                        <tr 
-                            data-fid="${row.FID}"
-                            data-gid="${row.GID}"
-                            data-schid="${row.SCH_ID}"
-                            data-billtypeid="${row.BILL_TYPE_ID}"
-                            data-formula="${encodeURIComponent(row.FORMULA)}">
-                            <td>${i + 1}</td>
-                            <td>${row.BILL_TYPE || ''}</td>
-                              <td>${row.PLANTNAME || ''}</td>
-                            <td>${row.FORMULA || ''}</td>
-                            
-                            <td>${row.ADDEDBY || ''}</td>
-                            <td>${row.ADDEDON || ''}</td>
-                            <td>${row.REMARKS || ''}</td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-primary btn-edit">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
+        <tr 
+            data-fid="${row.FID}"
+            data-gid="${row.GID}"
+            data-schid="${row.SCH_ID}"
+            data-billtypeid="${row.BILL_TYPE_ID}"
+            data-formula="${encodeURIComponent(row.FORMULA)}">
+
+            <td>${i + 1}</td>
+            <td>${row.BILL_TYPE || ''}</td>
+            <td>${row.PLANTNAME || ''}</td>
+            <td>${row.FORMULA || ''}</td>
+            <td>${row.ADDEDBY || ''}</td>
+            <td>${row.ADDEDON || ''}</td>
+            <td>${row.REMARKS || ''}</td>
+
+            <td class="text-center">
+                ${editCell}
+            </td>
+        </tr>
+    `;
                         });
 
                         $("#readingTable thead").html(thead);
@@ -535,7 +628,7 @@
 
                     } else {
                         $("#dataTableContainer").hide();
-                        showInfoMessage("Data Not Found");
+                        showWarningmessage("No Data Found");
                     }
                 },
                 error: function (xhr, status, error) {
@@ -686,6 +779,11 @@
 
 
         $(document).on("click", ".btn-edit", function () {
+
+            if (!hasEditAccess) {
+                return;
+            }
+
             $("#Id_Section2").show();
             $("#Id_Section1").hide();
             $("#btn_Save").hide();
@@ -694,6 +792,7 @@
 
             $("#btn_Cancel").show();
             $("#btn_Update").show();
+
             var row = $(this).closest("tr");
 
             editFID = row.data("fid");
@@ -770,9 +869,10 @@
                     var data = JSON.parse(response.d);
 
                     if (!data || data.length === 0) {
-                        $("#modalLogBody").html(
-                            '<div class="alert alert-info">No log data found</div>'
-                        );
+                        /* $("#modalLogBody").html(
+                             '<div class="alert alert-info">No log data found</div>'
+                         );*/
+                        showWarningMessage("No Data Found");
                         return;
                     }
 
@@ -830,25 +930,23 @@
     </script>
 </asp:Content>
 <asp:Content ID="Content2" ContentPlaceHolderID="ContentPlaceHolder1" runat="Server">
-    <div class="container-fluid mt-2">
+    <div class="container-fluid">
 
-        <div class="card shadow-sm mb-4">
+        <div class="card mt-2">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-bold">ECR Formula Builder</span>
 
-                <div class="d-flex gap-2">
                     <button type="button" id="btn_Add" class="btn btn-primary btn-sm">
                         Add
                     </button>
                     <button type="button" id="btn_back" class="btn btn-danger btn-sm">
                         Back
                     </button>
-                </div>
             </div>
 
             <div class="card-body" id="Id_Section1">
-                <div class="row mb-3">
-                    <div class="col-md-3">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">Generation Type<span class="text-danger">*</span></label>
                         <select id="ddl_GenType" class="form-select">
                             <option value="">-- Select Generation Type --</option>
@@ -859,14 +957,14 @@
                         </select>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">Generator Name :<span class="text-danger">*</span></label>
                         <select id="ddl_Plant_type" class="form-select">
                             <option value="">-- Select Generator Name --</option>
                         </select>
                     </div>
 
-                    <div class="col-md-12 text-end align-self-end">
+                    <div class="col-md-12 text-end align-self-end mb-3">
                         <button type="button" id="btn_viewbtn" class="btn btn-primary btn-sm">
                             View
                         </button>
@@ -886,7 +984,7 @@
                     </div>
                 </div>--%>
 
-                <div class="row mt-3" id="dataTableContainer" style="display: none">
+                <div class="row" id="dataTableContainer" style="display: none">
                     <div class="col-12">
                         <div class="table-responsive table-container">
                             <table id="readingTable" class="table table-striped table-bordered" style="width: 100%">
@@ -904,10 +1002,10 @@
                 <asp:HiddenField runat="server" ID="hidgridrdbtn" Value="null" />
 
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">Generation Type :<span class="text-danger">*</span></label>
                         <select id="ddl_Gen_Type" class="form-select">
-                            <option value="">-- Select Generation Type --</option>
+                            <option value="">Select Generation Type</option>
                             <%-- <option value="1">Hydro</option>--%>
                             <option value="1">Thermal</option>
                             <%-- <option value="3">Solar</option>
@@ -915,28 +1013,28 @@
                         </select>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">Generator Name :<span class="text-danger">*</span></label>
                         <select id="ddl_Ptype" class="form-select">
                             <option value="">-- Select Generator Name --</option>
                         </select>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold">Plant Name :<span class="text-danger">*</span></label>
                         <select id="ddl_PlantName" class="form-select">
                             <option value="">-- Select Plant Name --</option>
                         </select>
                     </div>
 
-                    <div class="col-md-3" id="txt_rem">
+                    <div class="col-md-3 mb-3" id="txt_rem">
                         <label>Remarks<span class="text-danger">*</span> :</label>
                         <input type="text" class="form-control" id="txt_remarks">
                     </div>
                 </div>
 
 
-                <div class="row mb-4 ">
+                <div class="row mb-3 ">
                     <div class="col-12">
                         <label class="form-label fw-bold">Formula Expression :</label>
                         <div id="formulaDisplay"
@@ -949,7 +1047,7 @@
                     </div>
                 </div>
 
-                <div class="row mb-4">
+                <div class="row mb-3">
                     <div class="col-lg-10 col-md-9">
                         <div class="card border-primary mb-3">
                             <div class="card-header bg-light">
@@ -959,7 +1057,6 @@
                             </div>
                             <div class="card-body">
                                 <div class="row" id="termButtonsContainer">
-                                    <!-- Term buttons will be loaded here dynamically -->
                                 </div>
                             </div>
                         </div>
@@ -1055,15 +1152,6 @@
                             <div class="modal-body" id="modalLogBody">
                                 <div class="alert alert-success" role="alert" id="ALERMSG" runat="server" visible="false">No Data Found...!</div>
                                 <div style="overflow: auto; height: 400px;">
-                                    <asp:GridView ID="Gridlogs" runat="server" CssClass="table table-bordered" AutoGenerateColumns="False">
-
-                                        <EmptyDataTemplate>
-                                            <div style="text-align: center; padding: 10px; color: red;">
-                                                No data found
-                                            </div>
-                                        </EmptyDataTemplate>
-                                        <HeaderStyle CssClass="thead table-active" />
-                                    </asp:GridView>
                                 </div>
                             </div>
 
@@ -1077,6 +1165,5 @@
 
             </div>
         </div>
-
     </div>
 </asp:Content>

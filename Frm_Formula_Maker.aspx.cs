@@ -27,16 +27,17 @@ public partial class CGS_Frm_Formula_Maker : System.Web.UI.Page
     static string[] Param1 = new string[40];
     static string[] PName1 = new string[40];
     static int Count = 0;
-    static string login_user = "";
-    static string companyn = "";
+    static string login_user = ""; static string companyn = "";
     static string userId = "";
-    static int FormId = 106;
+    static int FormId = 105;
 
     protected void Page_Load(object sender, EventArgs e)
     {
         if (HttpContext.Current.Session["UserId"] == null)
         {
             Response.Redirect("/templates/login/LoginMain.aspx");
+
+
         }
         else
         {
@@ -44,12 +45,57 @@ public partial class CGS_Frm_Formula_Maker : System.Web.UI.Page
             userId = HttpContext.Current.Session["UserId"].ToString();
             ClientScript.RegisterStartupScript(this.GetType(), "setUserId",
                  "var loggedUserId = '" + userId + "';", true);
+            //  companyn = HttpContext.Current.Session["TABLE_USER_NAME"].ToString();
             companyn = HttpContext.Current.Session["StackHolderId"].ToString();
         }
         if (!IsPostBack)
         {
+
         }
     }
+
+
+    [WebMethod]
+    public static string getLoginUserId()
+    {
+        try
+        {
+            return userId = HttpContext.Current.Session["UserId"].ToString();
+        }
+        catch (Exception ex)
+        {
+
+        }
+        return null;
+    }
+
+    [System.Web.Services.WebMethod]
+    public static List<int> GetAllowedUserIds()
+    {
+
+        List<int> allowed = new List<int>();
+
+        Param[0] = FormId.ToString();
+        PName[0] = "@FORMID";
+
+        DataTable dt = SqlCmd.SelectDatakpcl("SP_GET_FORM_DETAILS", Param, PName, 1);
+
+        foreach (DataRow row in dt.Rows)
+        {
+            if (!string.IsNullOrEmpty(row["PWRITE"].ToString()))
+            {
+                allowed.AddRange(
+                    row["PWRITE"].ToString()
+                       .Split(',')
+                       .Select(x => Convert.ToInt32(x.Trim()))
+                );
+            }
+        }
+
+        return allowed;
+    }
+
+
 
     [WebMethod]
     public static string GetThermalTerms()
@@ -315,9 +361,7 @@ public partial class CGS_Frm_Formula_Maker : System.Web.UI.Page
             PName[7] = "@UPDATEDBY";
             PName[8] = "@REMARKS";
 
-
             Count = 9;
-
 
             int i = SqlCmd.ExecNonQuerykpcl("SP_UPDATE_FORMULA", Param, PName, Count);
 
